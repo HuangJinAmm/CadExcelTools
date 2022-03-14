@@ -1,3 +1,4 @@
+from msilib.schema import Property
 import win32com
 from win32com.client import Dispatch,VARIANT
 import pythoncom
@@ -25,7 +26,19 @@ class AutoCad(object):
         self.modpace = self.doc.ModelSpace
         self.aselect = self.doc.ActiveSelectionSet
 
+    @property
+    def getCurrentDocName(self) -> str:
+        return self.doc.Name
+        
+    @property
+    def getHWND(self):
+        return self.doc.HWND
     
+    def sendCommand(self,cmd):
+        self.doc.sendCommand(cmd)
+
+    def postCommand(self,cmd):
+        self.doc.PostCommand(cmd)
     # 手动选择
     # @param objecName 对象类型
     # @param nameList 对象名 or关系
@@ -75,12 +88,41 @@ class AutoCad(object):
             if predict(item):
                 yield item  
 
+
+    # 全选指定对象
+    def selectAll(self,typeofcadobj="AcDbBlockReference",namelist = None,predicate = None):
+        block = self.doc.ActiveSelectionSet
+        block.Clear()
+        ft = [100]
+        fd = [typeofcadobj]
+        if bool(namelist):
+            ftn = [-4,-4]
+            fdn = ['<OR','OR>']
+            ft.insert(0,-4)
+            fd.insert(0,'<AND')
+            for n in namelist:
+                ftn.insert(1,2)
+                fdn.insert(1,n)
+            ft.extend(ftn)
+            ft.append(-4)
+            fd.extend(fdn)
+            fd.append('AND>')
+        vft = VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_I2, ft)
+        vfd = VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_VARIANT, fd)
+        block.Select(4,vft,vfd)
+        count = block.count
+        re_list = []
+        for i in range(count):
+            item = block.Item(i)
+            re_list.append(item)
+        return re_list
+
     # 按两点确定的框选
     def selectByPonits(self,point1,point2,*,objectName="AcDbBlockReference",names="",predict=None):
         ft = [100]
         fd = [objectName]
         if bool(names):
-            if isinstance(nameList,str):
+            if isinstance(names,str):
                 nameList = [names]
             ftn = [-4,-4]
             fdn = ['<OR','OR>']
@@ -233,7 +275,28 @@ class Point:
     @z.setter
     def z(self,value):
         self._z = value
-    
+    #@param precision 精度
+    # 大于零表示 小数点左边位数
+    # 小于零表示小数点右边位数
+    def equals2D(self,other,precision:int=0) -> bool:
+        if isinstance(other, (list, tuple)):
+            return (round(self.x,precision)==round(other[0],precision) and round(self.y,precision)==round(other[1],precision))
+        elif isinstance(other, Point):
+            return round(self.x,precision)==round(other.x,precision) and round(self.y,precision)== round(other.y,precision) 
+        else:
+            raise TypeError("cant compare to other"+other.__class__.__name__)
+
+    @staticmethod
+    def roundPad(num,precision:int=0):
+        if precision <= 0:
+            precision = abs(precision)
+            return round(num,precision)
+        else:
+            precision = pow(10,precision)
+            return (num // precision)*precision
+
+
+
     @property
     def array(self):
         return array.array('f',[self._x,self._y,self._z])
@@ -309,3 +372,16 @@ class Point:
             return self.x==other[0] and self.y==other[1] and self.z ==other[2]
         elif isinstance(other, Point):
             return self.x == other.x and self.y ==other.y and self.z == other.z
+        else:
+            raise TypeError("cant compare to other"+other.__class__.__name__)
+
+
+
+def test_selectAll():
+    app = AutoCad()
+    for item in app.searhAll(["AcDbText","AcDbMText"]):
+        print(item.objectName)
+
+
+if __name__ == "__main__":
+    test_selectAll()

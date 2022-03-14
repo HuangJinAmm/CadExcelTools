@@ -2,7 +2,7 @@ import openpyxl
 import xlrd
 class Excel:
 
-    def __init__(self,headPosition=0,sheet=0,template=""):
+    def __init__(self,headPosition=(0,0),sheet=0,template=None):
         self.hp = headPosition
         self.sht = sheet 
         self.temp = template
@@ -44,12 +44,28 @@ class Excel:
                 break
         return retList
 
-    def writeTofile(self,dataMap,fileName):
-        if self.temp:
+    def writeTofile(self,dataMap,root,fileName:str,filenamePost:str = None):
+        
+        if not bool(self.temp):
             wb = openpyxl.Workbook()
         else:
-            wb = openpyxl.load_workbook(fileName,read_only=True)
+            wb = openpyxl.load_workbook(self.temp)
+
         ws = wb.active
+        if bool(filenamePost):
+            ws[filenamePost] = fileName[0:fileName.rindex(".")]
+        if isinstance(dataMap[0],dict):
+            for row in dataMap:
+                for key,value in row.items():
+                    ws[key] = value
+        elif isinstance(dataMap[0],(list,tuple)):
+            for i,row in enumerate(dataMap):
+                for y,v in enumerate(row):
+                    ws.cell(row=i+self.hp[0]+1,column=y+self.hp[1]+1,value=v)
+        
+        wb.save(root+fileName)
+
+    
         
 
 
